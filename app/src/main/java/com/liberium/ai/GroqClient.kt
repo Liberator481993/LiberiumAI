@@ -15,7 +15,8 @@ object GroqClient {
     suspend fun send(
         apiKey: String,
         history: List<ChatMessage>,
-        attachments: List<PreparedAttachment> = emptyList()
+        attachments: List<PreparedAttachment> = emptyList(),
+        textModel: String = TEXT_MODEL
     ): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "Сначала добавь API-ключ в настройках." }
         val images = attachments.filter { it.imageDataUrl != null }
@@ -51,7 +52,7 @@ object GroqClient {
         } else prompt
 
         messages.put(JSONObject().put("role", "user").put("content", userContent))
-        val model = if (images.isNotEmpty()) VISION_MODEL else TEXT_MODEL
+        val model = if (images.isNotEmpty()) VISION_MODEL else textModel
         val body = JSONObject()
             .put("model", model)
             .put("messages", messages)
