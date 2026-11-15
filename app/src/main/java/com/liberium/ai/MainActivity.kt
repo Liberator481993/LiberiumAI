@@ -6,24 +6,29 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF0B0B12)
 private val Panel = Color(0xFF151521)
@@ -40,10 +45,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun LiberiumApp() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     var drawerOpen by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
-    var messages by remember { mutableStateOf(listOf<Pair<String, Boolean>>()) }
+    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     var chatTitle by remember { mutableStateOf("Новый чат") }
+    var apiKey by remember { mutableStateOf(SecureKeyStore.read(context)) }
+    var showSettings by remember { mutableStateOf(false) }
+    var keyDraft by remember { mutableStateOf(apiKey) }
+    var sending by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf(if (apiKey.isBlank()) "Нужен API-ключ" else "Groq подключается по запросу") }
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -57,8 +69,7 @@ fun LiberiumApp() {
         Row(Modifier.fillMaxSize().background(Ink)) {
             if (drawerOpen) {
                 Column(
-                    Modifier.width(270.dp).fillMaxHeight()
-                        .background(Panel).padding(16.dp)
+                    Modifier.width(270.dp).fillMaxHeight().background(Panel).padding(16.dp)
                 ) {
                     Text("LIBERIUM", color = Violet, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Text("AI", color = TextMain, fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -82,11 +93,10 @@ fun LiberiumApp() {
                     Text(
                         chatTitle,
                         color = TextMain,
-                        modifier = Modifier.fillMaxWidth().clickable { drawerOpen = false }
-                            .padding(vertical = 12.dp)
+                        modifier = Modifier.fillMaxWidth().clickable { drawerOpen = false }.padding(vertical = 12.dp)
                     )
                     Spacer(Modifier.weight(1f))
-                    Text("Liberium AI • 0.1.0", color = TextMuted, fontSize = 11.sp)
+                    Text("Liberium AI • 0.2.0", color = TextMuted, fontSize = 11.sp)
                 }
             }
 
@@ -101,7 +111,13 @@ fun LiberiumApp() {
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Liberium AI", color = TextMain, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("Личный AI-помощник", color = TextMuted, fontSize = 11.sp)
+                        Text(status, color = TextMuted, fontSize = 11.sp)
+                    }
+                    IconButton(onClick = {
+                        keyDraft = apiKey
+                        showSettings = true
+                    }) {
+                        Icon(Icons.Default.Settings, "Настройки", tint = Violet)
                     }
                     Surface(shape = CircleShape, color = Color(0xFF29233B)) {
                         Icon(Icons.Default.AutoAwesome, null, tint = Violet, modifier = Modifier.padding(10.dp).size(18.dp))
@@ -122,7 +138,9 @@ fun LiberiumApp() {
                         Spacer(Modifier.height(20.dp))
                         Text("Чем займёмся?", color = TextMain, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
-                        Text("Я — Liberium AI. Здесь появятся наши разговоры.", color = TextMuted, fontSize = 14.sp)
+                        Text("Спроси что угодно — Liberium AI ответит.", color = TextMuted, fontSize = 14.sp)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Модель: Groq • openai/gpt-oss-20b", color = TextMuted, fontSize = 11.sp)
                     }
                 } else {
                     LazyColumn(
@@ -130,17 +148,25 @@ fun LiberiumApp() {
                         contentPadding = PaddingValues(vertical = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(messages) { (body, fromUser) ->
+                        items(messages) { message ->
                             Row(
                                 Modifier.fillMaxWidth(),
-                                horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start
+                                horizontalArrangement = if (message.role == "user") Arrangement.End else Arrangement.Start
                             ) {
                                 Surface(
-                                    color = if (fromUser) Color(0xFF302447) else Panel,
+                                    color = if (message.role == "user") Color(0xFF302447) else Panel,
                                     shape = RoundedCornerShape(18.dp),
-                                    modifier = Modifier.widthIn(max = 310.dp)
+                                    modifier = Modifier.widthIn(max = 330.dp)
                                 ) {
-                                    Text(body, color = TextMain, modifier = Modifier.padding(14.dp), fontSize = 15.sp)
+                                    Text(message.content, color = TextMain, modifier = Modifier.padding(14.dp), fontSize = 15.sp)
+                                }
+                            }
+                        }
+                        if (sending) {
+                            item {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Violet, strokeWidth = 2.dp)
+                                    Text("Liberium думает…", color = TextMuted, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -154,7 +180,7 @@ fun LiberiumApp() {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = { }) {
-                                Icon(Icons.Default.AttachFile, "Прикрепить файл", tint = TextMuted)
+                                Icon(Icons.Default.AttachFile, "Вложения — следующий этап", tint = TextMuted)
                             }
                             TextField(
                                 value = input,
@@ -172,25 +198,44 @@ fun LiberiumApp() {
                             )
                             IconButton(
                                 onClick = {
-                                    val value = input.trim()
-                                    if (value.isNotEmpty()) {
-                                        messages = messages + (value to true) +
-                                            ("Основа приложения готова. Подключение AI появится на следующем этапе." to false)
-                                        if (chatTitle == "Новый чат") chatTitle = value.take(24)
-                                        input = ""
+                                    val text = input.trim()
+                                    if (text.isNotEmpty() && !sending) {
+                                        if (apiKey.isBlank()) {
+                                            keyDraft = ""
+                                            showSettings = true
+                                        } else {
+                                            val updated = messages + ChatMessage("user", text)
+                                            messages = updated
+                                            if (chatTitle == "Новый чат") chatTitle = text.take(24)
+                                            input = ""
+                                            sending = true
+                                            status = "Запрос отправляется…"
+                                            scope.launch {
+                                                try {
+                                                    val answer = GroqClient.send(apiKey, updated)
+                                                    messages = messages + ChatMessage("assistant", answer)
+                                                    status = "Подключено • Groq"
+                                                } catch (e: Exception) {
+                                                    messages = messages + ChatMessage(
+                                                        "assistant",
+                                                        "Не удалось получить ответ: ${e.message ?: "неизвестная ошибка"}\n\nПроверь интернет, API-ключ и бесплатный лимит Groq."
+                                                    )
+                                                    status = "Ошибка подключения"
+                                                } finally {
+                                                    sending = false
+                                                }
+                                            }
+                                        }
                                     }
                                 },
-                                enabled = input.isNotBlank(),
-                                modifier = Modifier.background(
-                                    if (input.isNotBlank()) Violet else Color(0xFF393443),
-                                    CircleShape
-                                )
+                                enabled = input.isNotBlank() && !sending,
+                                modifier = Modifier.background(if (input.isNotBlank() && !sending) Violet else Color(0xFF393443), CircleShape)
                             ) {
                                 Icon(Icons.Default.ArrowUpward, "Отправить", tint = Color.White)
                             }
                         }
                         Text(
-                            "Ответы пока демонстрационные — AI подключим на следующем этапе.",
+                            "Онлайн-модель Groq • бесплатный доступ зависит от лимитов провайдера",
                             color = TextMuted, fontSize = 10.sp,
                             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 7.dp)
                         )
@@ -198,5 +243,46 @@ fun LiberiumApp() {
                 }
             }
         }
+
+        if (showSettings) {
+            AlertDialog(
+                onDismissRequest = { showSettings = false },
+                title = { Text("Подключение AI") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Вставь свой Groq API-ключ. Он будет сохранён на телефоне в зашифрованном виде.", fontSize = 13.sp)
+                        OutlinedTextField(
+                            value = keyDraft,
+                            onValueChange = { keyDraft = it },
+                            label = { Text("Groq API key") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Получить ключ: console.groq.com/keys", color = Violet, fontSize = 12.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        apiKey = keyDraft.trim()
+                        SecureKeyStore.write(context, apiKey)
+                        status = if (apiKey.isBlank()) "Нужен API-ключ" else "Ключ сохранён • готов к запросу"
+                        showSettings = false
+                    }) { Text("Сохранить") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        keyDraft = ""
+                        apiKey = ""
+                        SecureKeyStore.write(context, "")
+                        status = "Нужен API-ключ"
+                        showSettings = false
+                    }) { Text("Удалить ключ") }
+                }
+            )
+        }
     }
 }
+
+data class ChatMessage(val role: String, val content: String)
