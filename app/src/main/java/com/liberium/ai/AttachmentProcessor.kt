@@ -134,7 +134,14 @@ object AttachmentProcessor {
                 if (ext !in setOf("txt", "md", "kt", "java", "js", "ts", "py", "json", "xml", "html", "css", "lua", "log", "yml", "yaml", "csv", "gradle")) continue
                 val remaining = (MAX_ZIP_TEXT_BYTES - totalBytes).coerceAtLeast(0).toInt()
                 if (remaining <= 0) break
-                val content = zip.readNBytes(remaining + 1)
+                val buffer = ByteArray(8192)
+                val output = ByteArrayOutputStream()
+                while (output.size() <= remaining) {
+                    val count = zip.read(buffer, 0, minOf(buffer.size, remaining + 1 - output.size()))
+                    if (count <= 0) break
+                    output.write(buffer, 0, count)
+                }
+                val content = output.toByteArray()
                 totalBytes += content.size
                 result.append("\n\n--- ").append(safeName).append(" ---\n")
                     .append(content.copyOf(minOf(content.size, remaining)).toString(Charsets.UTF_8))
