@@ -1,28 +1,29 @@
-# Liberium AI — Android starter
+# Liberium AI — Android
 
-Первый этап: нативная Android-оболочка на Kotlin и Jetpack Compose.
+Native Android AI chat app built with Kotlin and Jetpack Compose.
 
-## Что уже есть
-- Тёмная тема с фиолетовым акцентом.
-- Главный экран чата.
-- Боковая панель и кнопка нового чата.
-- Поле ввода и демонстрационное отображение сообщений.
+## Stage 1
+- Dark chat UI and sidebar.
+- Groq chat-completions integration.
+- User-provided Groq API key.
+- API key encrypted locally with Android Keystore (AES-GCM).
+- Chat context sent with the latest 24 messages.
 
-## Пока не подключено
-- Настоящая AI-модель.
-- Сохранение истории после закрытия приложения.
-- Реальная отправка вложений и голосовой ввод.
+## Connect the AI
+1. Create a Groq account at https://console.groq.com/
+2. Create an API key at https://console.groq.com/keys
+3. Install the app and open Settings.
+4. Paste the key. The key is stored encrypted on this device.
+5. Send a message.
 
-## Сборка
-Открой проект в Android Studio с JDK 17, дождись Gradle Sync и собери:
-Build > Build Bundle(s) / APK(s) > Build APK(s).
+The app calls https://api.groq.com/openai/v1/chat/completions using model openai/gpt-oss-20b. Model access and free quotas are controlled by Groq and may change. No provider quota is guaranteed.
 
-Пакет: com.liberium.ai
-Минимальная версия Android: API 26 (Android 8.0).
+## Privacy and security
+- Never share your API key or commit it to GitHub.
+- Requests are sent directly from this phone to Groq.
+- The provider receives the messages included in each request; do not send secrets or sensitive personal data.
+- Removing the key in app settings clears its encrypted local copy.
 
-## Следующие этапы
-1. Подключить бесплатного онлайн-провайдера с лимитами и обработкой ошибок.
-2. Добавить локальную модель для офлайн-режима.
-3. Добавить сохранение истории, настройки и загрузку файлов.
-
-Не добавляйте API-ключи в исходный код или публичный GitHub-репозиторий.
+## Build
+Open in Android Studio with JDK 17, sync Gradle, then Build > Build Bundle(s) / APK(s) > Build APK(s).
+Package: com.liberium.ai. Min Android: API 26.
