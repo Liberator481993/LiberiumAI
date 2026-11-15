@@ -1,8 +1,11 @@
 package com.liberium.ai
 
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -56,6 +59,10 @@ fun LiberiumApp() {
     var keyDraft by remember { mutableStateOf(apiKey) }
     var sending by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (apiKey.isBlank()) "Нужен API-ключ" else "Groq подключается по запросу") }
+    var pendingUris by remember { mutableStateOf(listOf<Uri>()) }
+    val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
+        pendingUris = (pendingUris + picked).distinct()
+    }
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -175,12 +182,18 @@ fun LiberiumApp() {
 
                 Surface(color = Ink, shadowElevation = 8.dp) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        if (pendingUris.isNotEmpty()) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Файлов: ${pendingUris.size} • ${pendingUris.take(2).joinToString { it.lastPathSegment?.substringAfterLast('/') ?: "вложение" }}", color = Violet, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 2)
+                                TextButton(onClick = { pendingUris = emptyList() }) { Text("Очистить") }
+                            }
+                        }
                         Row(
                             Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(24.dp)).padding(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = { }) {
-                                Icon(Icons.Default.AttachFile, "Вложения — следующий этап", tint = TextMuted)
+                            IconButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }) {
+                                Icon(Icons.Default.AttachFile, "Прикрепить файлы и фото", tint = if (pendingUris.isEmpty()) TextMuted else Violet)
                             }
                             TextField(
                                 value = input,
@@ -204,15 +217,19 @@ fun LiberiumApp() {
                                             keyDraft = ""
                                             showSettings = true
                                         } else {
-                                            val updated = messages + ChatMessage("user", text)
+                                            val selectedUris = pendingUris.toList()
+                                            val attachmentLabel = if (selectedUris.isEmpty()) "" else "\\n\\n[Прикреплено файлов: ${selectedUris.size}]"
+                                            val updated = messages + ChatMessage("user", text + attachmentLabel)
                                             messages = updated
                                             if (chatTitle == "Новый чат") chatTitle = text.take(24)
                                             input = ""
+                                            pendingUris = emptyList()
                                             sending = true
                                             status = "Запрос отправляется…"
                                             scope.launch {
                                                 try {
-                                                    val answer = GroqClient.send(apiKey, updated)
+                                                    val prepared = selectedUris.map { AttachmentProcessor.prepare(context, it) }
+                                                    val answer = GroqClient.send(apiKey, updated, prepared)
                                                     messages = messages + ChatMessage("assistant", answer)
                                                     status = "Подключено • Groq"
                                                 } catch (e: Exception) {
@@ -235,7 +252,7 @@ fun LiberiumApp() {
                             }
                         }
                         Text(
-                            "Онлайн-модель Groq • бесплатный доступ зависит от лимитов провайдера",
+                            "Фото, PDF, DOCX, TXT, код и ZIP • ограничения провайдера могут применяться",
                             color = TextMuted, fontSize = 10.sp,
                             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 7.dp)
                         )
