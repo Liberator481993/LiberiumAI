@@ -8,10 +8,8 @@ import android.provider.OpenableColumns
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
-import org.w3c.dom.Element
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipInputStream
-import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 
 data class PreparedAttachment(
@@ -166,8 +164,6 @@ object AttachmentProcessor {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
         factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
         factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
         val document = factory.newDocumentBuilder().parse(xml.byteInputStream())
         val nodes = document.getElementsByTagName("w:t")
         return buildString {
