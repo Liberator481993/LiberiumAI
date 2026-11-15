@@ -55,6 +55,7 @@ fun LiberiumApp() {
     var messages by remember { mutableStateOf(ChatStorage.load(context)) }
     var chatTitle by remember { mutableStateOf("Новый чат") }
     var apiKey by remember { mutableStateOf(SecureKeyStore.read(context)) }
+    var textModel by remember { mutableStateOf(context.getSharedPreferences("liberium_settings", android.content.Context.MODE_PRIVATE).getString("text_model", "openai/gpt-oss-20b") ?: "openai/gpt-oss-20b") }
     var showSettings by remember { mutableStateOf(false) }
     var keyDraft by remember { mutableStateOf(apiKey) }
     var sending by remember { mutableStateOf(false) }
@@ -235,7 +236,7 @@ fun LiberiumApp() {
                                                     val extracted = prepared.filter { it.extractedText.isNotBlank() }.joinToString("\n\n") { file -> "Файл: ${file.name}\n${file.extractedText}" }
                                                     val enriched = if (extracted.isBlank()) updated else updated.dropLast(1) + updated.last().copy(content = updated.last().content + "\n\nСодержимое прикреплённых файлов для дальнейшего контекста:\n" + extracted)
                                                     messages = enriched
-                                                    val answer = GroqClient.send(apiKey, enriched, prepared)
+                                                    val answer = GroqClient.send(apiKey, enriched, prepared, textModel)
                                                     messages = enriched + ChatMessage("assistant", answer)
                                                     status = "Подключено • Groq"
                                                 } catch (e: Exception) {
@@ -283,7 +284,17 @@ fun LiberiumApp() {
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("Получить ключ: console.groq.com/keys", color = Violet, fontSize = 12.sp)
+                        Text("Текстовая модель", fontWeight = FontWeight.SemiBold, color = TextMain)
+                        listOf("openai/gpt-oss-20b", "openai/gpt-oss-120b").forEach { model ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = textModel == model, onClick = {
+                                    textModel = model
+                                    context.getSharedPreferences("liberium_settings", android.content.Context.MODE_PRIVATE).edit().putString("text_model", model).apply()
+                                })
+                                Text(model, color = TextMain, fontSize = 13.sp)
+                            }
+                        }
+                        Text("Для фотографий автоматически используется Qwen Vision. Ключ: console.groq.com/keys", color = Violet, fontSize = 12.sp)
                     }
                 },
                 confirmButton = {
