@@ -52,7 +52,7 @@ fun LiberiumApp() {
     val scope = rememberCoroutineScope()
     var drawerOpen by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
-    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+    var messages by remember { mutableStateOf(ChatStorage.load(context)) }
     var chatTitle by remember { mutableStateOf("Новый чат") }
     var apiKey by remember { mutableStateOf(SecureKeyStore.read(context)) }
     var showSettings by remember { mutableStateOf(false) }
@@ -63,6 +63,8 @@ fun LiberiumApp() {
     val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
         pendingUris = (pendingUris + picked).distinct()
     }
+
+    LaunchedEffect(messages) { ChatStorage.save(context, messages) }
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -84,6 +86,7 @@ fun LiberiumApp() {
                     FilledTonalButton(
                         onClick = {
                             messages = emptyList()
+                            ChatStorage.clear(context)
                             chatTitle = "Новый чат"
                             drawerOpen = false
                         },
@@ -229,8 +232,11 @@ fun LiberiumApp() {
                                             scope.launch {
                                                 try {
                                                     val prepared = selectedUris.map { AttachmentProcessor.prepare(context, it) }
-                                                    val answer = GroqClient.send(apiKey, updated, prepared)
-                                                    messages = messages + ChatMessage("assistant", answer)
+                                                    val extracted = prepared.filter { it.extractedText.isNotBlank() }.joinToString("\n\n") { file -> "Файл: ${file.name}\n${file.extractedText}" }
+                                                    val enriched = if (extracted.isBlank()) updated else updated.dropLast(1) + updated.last().copy(content = updated.last().content + "\n\nСодержимое прикреплённых файлов для дальнейшего контекста:\n" + extracted)
+                                                    messages = enriched
+                                                    val answer = GroqClient.send(apiKey, enriched, prepared)
+                                                    messages = enriched + ChatMessage("assistant", answer)
                                                     status = "Подключено • Groq"
                                                 } catch (e: Exception) {
                                                     messages = messages + ChatMessage(
