@@ -107,7 +107,14 @@ object AttachmentProcessor {
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (entry.name == "word/document.xml") {
-                    found = zip.readBytes().toString(Charsets.UTF_8)
+                    val output = ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    while (output.size() < MAX_ZIP_TEXT_BYTES) {
+                        val count = zip.read(buffer, 0, minOf(buffer.size, (MAX_ZIP_TEXT_BYTES - output.size()).toInt()))
+                        if (count <= 0) break
+                        output.write(buffer, 0, count)
+                    }
+                    found = output.toByteArray().toString(Charsets.UTF_8)
                     break
                 }
             }
