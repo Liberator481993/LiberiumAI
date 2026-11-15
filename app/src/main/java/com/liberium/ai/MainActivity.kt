@@ -1,6 +1,9 @@
 package com.liberium.ai
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -63,6 +66,15 @@ fun LiberiumApp() {
     var pendingUris by remember { mutableStateOf(listOf<Uri>()) }
     val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
         pendingUris = (pendingUris + picked).distinct()
+    }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     LaunchedEffect(messages) { ChatStorage.save(context, messages) }
@@ -230,8 +242,10 @@ fun LiberiumApp() {
                                             pendingUris = emptyList()
                                             sending = true
                                             status = "Запрос отправляется…"
+                                            DynamicIslandStatus.show(context, "Liberium AI", "Генерирую ответ…", true)
                                             scope.launch {
                                                 try {
+                                                    if (selectedUris.isNotEmpty()) DynamicIslandStatus.show(context, "Liberium AI", "Анализирую ${selectedUris.size} вложений…", true)
                                                     val prepared = selectedUris.map { AttachmentProcessor.prepare(context, it) }
                                                     val extracted = prepared.filter { it.extractedText.isNotBlank() }.joinToString("\n\n") { file -> "Файл: ${file.name}\n${file.extractedText}" }
                                                     val enriched = if (extracted.isBlank()) updated else updated.dropLast(1) + updated.last().copy(content = updated.last().content + "\n\nСодержимое прикреплённых файлов для дальнейшего контекста:\n" + extracted)
@@ -239,12 +253,14 @@ fun LiberiumApp() {
                                                     val answer = GroqClient.send(apiKey, enriched, prepared, textModel)
                                                     messages = enriched + ChatMessage("assistant", answer)
                                                     status = "Подключено • Groq"
+                                                    DynamicIslandStatus.show(context, "Liberium AI", "Ответ готов. Нажми, чтобы открыть чат.", false)
                                                 } catch (e: Exception) {
                                                     messages = messages + ChatMessage(
                                                         "assistant",
                                                         "Не удалось получить ответ: ${e.message ?: "неизвестная ошибка"}\n\nПроверь интернет, API-ключ и бесплатный лимит Groq."
                                                     )
                                                     status = "Ошибка подключения"
+                                                    DynamicIslandStatus.show(context, "Liberium AI", "Не удалось завершить запрос. Нажми, чтобы вернуться в чат.", false)
                                                 } finally {
                                                     sending = false
                                                 }
