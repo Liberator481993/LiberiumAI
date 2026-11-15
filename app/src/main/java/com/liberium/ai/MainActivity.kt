@@ -218,7 +218,7 @@ fun LiberiumApp() {
                                             showSettings = true
                                         } else {
                                             val selectedUris = pendingUris.toList()
-                                            val attachmentLabel = if (selectedUris.isEmpty()) "" else "\\n\\n[Прикреплено файлов: ${selectedUris.size}]"
+                                            val attachmentLabel = if (selectedUris.isEmpty()) "" else "\n\n[Прикреплено файлов: ${selectedUris.size}]"
                                             val updated = messages + ChatMessage("user", text + attachmentLabel)
                                             messages = updated
                                             if (chatTitle == "Новый чат") chatTitle = text.take(24)
