@@ -12,6 +12,7 @@ Native Android AI assistant built with Kotlin and Jetpack Compose.
 - ZIP inspection for supported text/code files with entry-count, extraction-size, and path traversal safeguards.
 - Extracted document text is retained in chat context for follow-up questions.
 - Selectable Groq text models: GPT-OSS 20B and GPT-OSS 120B; vision requests switch to Qwen automatically.
+- Ongoing AI activity notification with a tap-to-open action, intended to appear in compatible Android status chips / TECNO Dynamic Port surfaces while generating or analyzing attachments.
 
 ## Models and provider limits
 - Text: `openai/gpt-oss-20b` or `openai/gpt-oss-120b`.
