@@ -250,7 +250,15 @@ fun LiberiumApp() {
                                                     val extracted = prepared.filter { it.extractedText.isNotBlank() }.joinToString("\n\n") { file -> "Файл: ${file.name}\n${file.extractedText}" }
                                                     val enriched = if (extracted.isBlank()) updated else updated.dropLast(1) + updated.last().copy(content = updated.last().content + "\n\nСодержимое прикреплённых файлов для дальнейшего контекста:\n" + extracted)
                                                     messages = enriched
-                                                    val answer = GroqClient.send(apiKey, enriched, prepared, textModel)
+                                                    val provider = AiProviderRegistry.get(AiProviderRegistry.DEFAULT_PROVIDER_ID)
+                                                    val answer = provider.send(
+                                                        AiProviderRequest(
+                                                            apiKey = apiKey,
+                                                            history = enriched,
+                                                            attachments = prepared,
+                                                            model = textModel
+                                                        )
+                                                    )
                                                     messages = enriched + ChatMessage("assistant", answer)
                                                     status = "Подключено • Groq"
                                                     DynamicIslandStatus.show(context, "Liberium AI", "Ответ готов. Нажми, чтобы открыть чат.", false)

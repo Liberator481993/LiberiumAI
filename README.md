@@ -14,6 +14,9 @@ Native Android AI assistant built with Kotlin and Jetpack Compose.
 - Selectable Groq text models: GPT-OSS 20B and GPT-OSS 120B; vision requests switch to Qwen automatically.
 - Ongoing AI activity notification with a tap-to-open action, intended to appear in compatible Android status chips / TECNO Dynamic Port surfaces while generating or analyzing attachments.
 
+## Provider architecture status
+The app now has an internal provider interface and registry, and the chat screen calls that interface instead of calling the Groq client directly. Groq is still the only registered engine today. Additional cloud providers and local Android inference are roadmap work; they are not advertised as implemented.
+
 ## Models and provider limits
 - Text: `openai/gpt-oss-20b` or `openai/gpt-oss-120b`.
 - Images: `qwen/qwen3.8-27b`.
